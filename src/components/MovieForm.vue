@@ -1,68 +1,32 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useMovieStore } from '../stores/movieStore';
+import { onMounted } from 'vue';
+import { useMovieForm } from '../composables/useMovieForm';
+import { GENRE_OPTIONS, VALIDATION } from '../constants';
 
-const store = useMovieStore();
-const router = useRouter();
-const route = useRoute();
-
-const allGenres = [
-  'Action',
-  'Sci-Fi',
-  'Animation',
-  'Drama',
-  'Horror',
-  'Comedy',
-  'Romance',
-  'Thriller',
-];
-
-const movieForm = ref({
-  id: null,
-  title: '',
-  director: '',
-  summary: '',
-  genres: [],
-});
-
-const isEditMode = computed(() => !!route.params.id);
+const {
+  movieForm,
+  isEditMode,
+  isLoading,
+  isFormValid,
+  validationErrors,
+  initializeForm,
+  handleSubmit,
+  handleDelete,
+  navigateBack,
+} = useMovieForm();
 
 onMounted(() => {
-  if (isEditMode.value) {
-    const movieData = store.getMovieById(route.params.id);
-    if (movieData) {
-      movieForm.value = { ...movieData };
-    }
-  }
+  initializeForm();
 });
-
-const handleSubmit = () => {
-  if (isEditMode.value) {
-    store.updateMovie(movieForm.value);
-  } else {
-    store.addMovie(movieForm.value);
-  }
-  router.push('/');
-};
-
-const handleDelete = () => {
-  if (confirm('Are you sure you want to delete this movie?')) {
-    store.deleteMovie(movieForm.value.id);
-    router.push('/');
-  }
-};
 </script>
 
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50"
-  >
-    <div class="max-w-md mx-auto px-4 py-6 md:px-6 lg:max-w-lg lg:py-8">
-      <div class="mb-4">
+  <div class="min-h-screen bg-gray-50">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+      <header class="mb-8">
         <button
-          @click="router.push('/')"
-          class="flex items-center text-white hover:text-cyan-600 transition-colors duration-200"
+          @click="navigateBack"
+          class="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <svg
             class="w-5 h-5 mr-2"
@@ -75,122 +39,144 @@ const handleDelete = () => {
               stroke-linejoin="round"
               stroke-width="2"
               d="M15 19l-7-7 7-7"
-            ></path>
+            />
           </svg>
           Back to Movies
         </button>
-      </div>
 
-      <div
-        class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 p-6 md:p-8"
-      >
-        <div class="flex justify-between items-center mb-6">
-          <h1
-            class="text-lg md:text-lg font-semibold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent"
-          >
+        <div class="flex items-center justify-between">
+          <h1 class="text-3xl font-bold text-gray-900">
             {{ isEditMode ? 'Edit Movie' : 'Add New Movie' }}
           </h1>
-          <div class="flex gap-2">
+
+          <div v-if="isEditMode" class="flex gap-2">
             <button
-              v-if="isEditMode"
-              @click.prevent="handleDelete"
-              type="button"
-              class="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl"
-              title="Delete Movie"
+              @click="handleDelete"
+              :disabled="isLoading"
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-medium transition-colors"
             >
-              D
-            </button>
-            <button
-              @click="handleSubmit"
-              type="button"
-              class="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl"
-              title="Save Movie"
-            >
-              S
+              Delete
             </button>
           </div>
         </div>
+      </header>
 
-        <form @submit.prevent="handleSubmit" class="space-y-6">
+      <form
+        @submit.prevent="handleSubmit"
+        class="bg-white rounded-xl border border-gray-200 p-8"
+      >
+        <div
+          v-if="validationErrors.length > 0"
+          class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
+        >
+          <h3 class="text-sm font-medium text-red-800 mb-2">
+            Please fix the following errors:
+          </h3>
+          <ul class="text-sm text-red-700 space-y-1">
+            <li v-for="error in validationErrors" :key="error">
+              • {{ error }}
+            </li>
+          </ul>
+        </div>
+
+        <div class="space-y-6">
           <div>
             <label
               for="title"
-              class="block text-sm md:text-base font-semibold text-slate-700 mb-3"
-              >Title</label
+              class="block text-sm font-medium text-gray-700 mb-2"
             >
+              Movie Title *
+            </label>
             <input
-              type="text"
               id="title"
               v-model="movieForm.title"
+              type="text"
+              :maxlength="VALIDATION.TITLE_MAX_LENGTH"
               required
-              class="w-full px-5 py-4 md:py-5 bg-slate-50/70 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-slate-700 placeholder-slate-400 shadow-inner"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="Enter movie title"
             />
+            <p class="mt-1 text-xs text-gray-500">
+              {{ movieForm.title.length }}/{{
+                VALIDATION.TITLE_MAX_LENGTH
+              }}
+              characters
+            </p>
           </div>
 
           <div>
             <label
               for="director"
-              class="block text-sm md:text-base font-semibold text-slate-700 mb-3"
-              >Director</label
+              class="block text-sm font-medium text-gray-700 mb-2"
             >
+              Director *
+            </label>
             <input
-              type="text"
               id="director"
               v-model="movieForm.director"
+              type="text"
+              :maxlength="VALIDATION.DIRECTOR_MAX_LENGTH"
               required
-              class="w-full px-5 py-4 md:py-5 bg-slate-50/70 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-slate-700 placeholder-slate-400 shadow-inner"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="Enter director name"
             />
+            <p class="mt-1 text-xs text-gray-500">
+              {{ movieForm.director.length }}/{{
+                VALIDATION.DIRECTOR_MAX_LENGTH
+              }}
+              characters
+            </p>
           </div>
 
           <div>
             <label
               for="summary"
-              class="block text-sm md:text-base font-semibold text-slate-700 mb-3"
+              class="block text-sm font-medium text-gray-700 mb-2"
             >
               Summary
-              <span class="text-xs text-slate-500 ml-2"
-                >({{ movieForm.summary.length }}/100)</span
-              >
             </label>
             <textarea
               id="summary"
               v-model="movieForm.summary"
-              maxlength="100"
+              :maxlength="VALIDATION.SUMMARY_MAX_LENGTH"
               rows="4"
-              class="w-full px-5 py-4 bg-slate-50/70 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 text-slate-700 placeholder-slate-400 resize-none shadow-inner"
-              placeholder="Enter movie summary..."
-            ></textarea>
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+              placeholder="Enter movie summary (optional)"
+            />
+            <p class="mt-1 text-xs text-gray-500">
+              {{ movieForm.summary.length }}/{{
+                VALIDATION.SUMMARY_MAX_LENGTH
+              }}
+              characters
+            </p>
           </div>
 
           <div>
-            <label
-              class="block text-sm md:text-base font-semibold text-slate-700 mb-4"
-              >Genres</label
-            >
-            <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm font-medium text-gray-700 mb-3">
+              Genres * (Select at least one)
+            </label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <label
-                v-for="genre in allGenres"
+                v-for="genre in GENRE_OPTIONS"
                 :key="genre"
-                class="flex items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-200 cursor-pointer hover:bg-cyan-50/50 hover:border-cyan-300 transition-all duration-300 group"
+                class="relative flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                 :class="{
-                  'bg-cyan-100/70 border-cyan-400 shadow-md':
+                  'bg-blue-50 border-blue-300':
                     movieForm.genres.includes(genre),
                 }"
               >
                 <input
+                  v-model="movieForm.genres"
                   type="checkbox"
                   :value="genre"
-                  v-model="movieForm.genres"
                   class="sr-only"
                 />
                 <div
-                  class="w-5 h-5 rounded-lg border-2 mr-3 flex items-center justify-center transition-all duration-200"
+                  class="w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-all"
                   :class="
                     movieForm.genres.includes(genre)
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 border-cyan-500 shadow-sm'
-                      : 'border-slate-300 group-hover:border-cyan-400'
+                      ? 'bg-blue-600 border-blue-600'
+                      : 'border-gray-300'
                   "
                 >
                   <svg
@@ -205,15 +191,15 @@ const handleDelete = () => {
                       stroke-linejoin="round"
                       stroke-width="3"
                       d="M5 13l4 4L19 7"
-                    ></path>
+                    />
                   </svg>
                 </div>
                 <span
-                  class="text-sm md:text-base font-medium transition-colors duration-200"
+                  class="text-sm font-medium transition-colors"
                   :class="
                     movieForm.genres.includes(genre)
-                      ? 'text-cyan-700'
-                      : 'text-slate-700 group-hover:text-cyan-600'
+                      ? 'text-blue-900'
+                      : 'text-gray-700'
                   "
                 >
                   {{ genre }}
@@ -221,8 +207,42 @@ const handleDelete = () => {
               </label>
             </div>
           </div>
-        </form>
-      </div>
+        </div>
+
+        <div class="flex justify-end pt-8 border-t border-gray-200 mt-8">
+          <button
+            type="submit"
+            :disabled="!isFormValid || isLoading"
+            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors min-w-[120px]"
+          >
+            <span v-if="isLoading" class="flex items-center justify-center">
+              <svg
+                class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Saving...
+            </span>
+            <span v-else>
+              {{ isEditMode ? 'Update Movie' : 'Create Movie' }}
+            </span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </template>

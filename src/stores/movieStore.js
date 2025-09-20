@@ -1,76 +1,107 @@
 import { defineStore } from 'pinia';
-import movies from '../data/data.js';
+import { computed, ref } from 'vue';
+import { STORAGE_KEYS } from '../constants';
+import initialMovies from '../data/data';
 
 const loadMoviesFromStorage = () => {
-  const stored = localStorage.getItem('movies');
-  return stored ? JSON.parse(stored) : movies;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.MOVIES);
+    return stored ? JSON.parse(stored) : initialMovies;
+  } catch (error) {
+    console.error('Failed to load movies from storage:', error);
+    return initialMovies;
+  }
 };
 
 const saveMoviesToStorage = (movies) => {
-  localStorage.setItem('movies', JSON.stringify(movies));
+  try {
+    localStorage.setItem(STORAGE_KEYS.MOVIES, JSON.stringify(movies));
+  } catch (error) {
+    console.error('Failed to save movies to storage:', error);
+  }
 };
 
-export const useMovieStore = defineStore('movie', {
-  state: () => ({
-    movies: loadMoviesFromStorage(),
-    searchQuery: '',
-  }),
+const generateId = () =>
+  `movie_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  getters: {
-    filteredMovies: (state) => {
-      if (!state.searchQuery) return state.movies;
-      return state.movies.filter(
-        (movie) =>
-          movie.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-          movie.director
-            .toLowerCase()
-            .includes(state.searchQuery.toLowerCase()) ||
-          movie.genres.some((genre) =>
-            genre.toLowerCase().includes(state.searchQuery.toLowerCase())
-          )
-      );
-    },
-  },
+export const useMovieStore = defineStore('movies', () => {
+  const movies = ref(loadMoviesFromStorage());
+  const searchQuery = ref('');
 
-  actions: {
-    setSearchQuery(query) {
-      this.searchQuery = query;
-    },
+  const filteredMovies = computed(() => {
+    if (!searchQuery.value.trim()) return movies.value;
 
-    getMovieById(id) {
-      return this.movies.find((movie) => movie.id === id);
-    },
+    const query = searchQuery.value.toLowerCase().trim();
+    return movies.value.filter(
+      (movie) =>
+        movie.title.toLowerCase().includes(query) ||
+        movie.director.toLowerCase().includes(query) ||
+        movie.genres.some((genre) => genre.toLowerCase().includes(query)) ||
+        (movie.summary && movie.summary.toLowerCase().includes(query))
+    );
+  });
 
-    addMovie(movieData) {
-      const newMovie = {
-        ...movieData,
-        id: Date.now().toString(),
-      };
-      this.movies.push(newMovie);
-      saveMoviesToStorage(this.movies);
-    },
+  const getMovieById = (id) => {
+    return movies.value.find((movie) => movie.id === id);
+  };
 
-    updateMovie(updatedMovie) {
-      const index = this.movies.findIndex(
-        (movie) => movie.id === updatedMovie.id
-      );
-      if (index !== -1) {
-        this.movies[index] = updatedMovie;
-        saveMoviesToStorage(this.movies);
-      }
-    },
+  const addMovie = (movieData) => {
+    const newMovie = {
+      id: generateId(),
+      title: movieData.title?.trim() || '',
+      director: movieData.director?.trim() || '',
+      summary: movieData.summary?.trim() || '',
+      genres: Array.isArray(movieData.genres) ? movieData.genres : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    deleteMovie(id) {
-      const index = this.movies.findIndex((movie) => movie.id === id);
-      if (index !== -1) {
-        this.movies.splice(index, 1);
-        saveMoviesToStorage(this.movies);
-      }
-    },
+    movies.value.unshift(newMovie);
+    saveMoviesToStorage(movies.value);
+    return newMovie;
+  };
 
-    resetMovies() {
-      this.movies = [...movies];
-      saveMoviesToStorage(this.movies);
-    },
-  },
+  const updateMovie = (updatedMovie) => {
+    const index = movies.value.findIndex(
+      (movie) => movie.id === updatedMovie.id
+    );
+    if (index === -1) return false;
+
+    movies.value[index] = {
+      ...updatedMovie,
+      updatedAt: new Date().toISOString(),
+    };
+    saveMoviesToStorage(movies.value);
+    return true;
+  };
+
+  const deleteMovie = (id) => {
+    const index = movies.value.findIndex((movie) => movie.id === id);
+    if (index === -1) return false;
+
+    movies.value.splice(index, 1);
+    saveMoviesToStorage(movies.value);
+    return true;
+  };
+
+  const resetMovies = () => {
+    movies.value = [...initialMovies];
+    saveMoviesToStorage(movies.value);
+  };
+
+  const setSearchQuery = (query) => {
+    searchQuery.value = query;
+  };
+
+  return {
+    movies: computed(() => movies.value),
+    searchQuery: computed(() => searchQuery.value),
+    filteredMovies,
+    getMovieById,
+    addMovie,
+    updateMovie,
+    deleteMovie,
+    resetMovies,
+    setSearchQuery,
+  };
 });
