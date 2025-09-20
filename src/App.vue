@@ -1,9 +1,7 @@
-<script setup>
-import MovieList from './components/MovieList.vue';
-</script>
+<script setup></script>
 
 <template>
-  <div class="bg-gray-100 min-h-screen">
-    <MovieList />
+  <div class="bg-white min-h-screen">
+    <router-view />
   </div>
 </template>
